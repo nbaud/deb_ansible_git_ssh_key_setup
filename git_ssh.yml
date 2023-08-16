@@ -1,0 +1,53 @@
+---
+- hosts: localhost
+  become: yes
+  tasks:
+    - name: Install git
+      apt:
+        name: git
+        state: present
+
+    - name: Check if SSH key already exists
+      stat:
+        path: "~/.ssh/git_id_ed25519"
+      register: ssh_key_check
+
+    - name: Generate SSH key
+      command:
+        cmd: ssh-keygen -t ed25519 -C "nbaudoin@gmail.com" -f ~/.ssh/git_id_ed25519 -N ""
+      when: not ssh_key_check.stat.exists
+
+    - name: Display public key
+      command:
+        cmd: cat ~/.ssh/git_id_ed25519.pub
+      register: pub_key
+      changed_when: false
+      when: not ssh_key_check.stat.exists
+
+    - debug:
+        var: pub_key.stdout
+        verbosity: 1
+
+    - name: Start ssh-agent
+      shell: ssh-agent
+      register: ssh_agent_start
+      changed_when: false
+
+    - name: Add SSH key to ssh-agent
+      shell: |
+        export SSH_AUTH_SOCK={{ ssh_agent_start.stdout_lines[0].split(';')[0].split('=')[1] }}
+        export SSH_AGENT_PID={{ ssh_agent_start.stdout_lines[1].split(';')[0].split('=')[1] }}
+        ssh-add ~/.ssh/git_id_ed25519
+      args:
+        executable: /bin/bash
+
+    - name: List added SSH identities
+      shell: |
+        export SSH_AUTH_SOCK={{ ssh_agent_start.stdout_lines[0].split(';')[0].split('=')[1] }}
+        ssh-add -l
+      register: added_keys
+      changed_when: false
+
+    - debug:
+        var: added_keys.stdout_lines
+        verbosity: 1
