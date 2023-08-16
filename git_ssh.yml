@@ -28,26 +28,24 @@
         var: pub_key.stdout
         verbosity: 1
 
-    - name: Start ssh-agent
-      shell: ssh-agent
-      register: ssh_agent_start
-      changed_when: false
-
-    - name: Add SSH key to ssh-agent
+    - name: Start ssh-agent, add key, and list identities
       shell: |
-        export SSH_AUTH_SOCK={{ ssh_agent_start.stdout_lines[0].split(';')[0].split('=')[1] }}
-        export SSH_AGENT_PID={{ ssh_agent_start.stdout_lines[1].split(';')[0].split('=')[1] }}
+        eval $(ssh-agent -s)
         ssh-add ~/.ssh/git_id_ed25519
-      args:
-        executable: /bin/bash
-
-    - name: List added SSH identities
-      shell: |
-        export SSH_AUTH_SOCK={{ ssh_agent_start.stdout_lines[0].split(';')[0].split('=')[1] }}
         ssh-add -l
-      register: added_keys
+      register: ssh_agent_output
       changed_when: false
+
+    - debug:
+        var: ssh_agent_output.stdout_lines
+        verbosity: 1
 
     - debug:
         var: added_keys.stdout_lines
         verbosity: 1
+
+    - name: Source .bashrc for root
+      shell: |
+        source /root/.bashrc
+      args:
+        executable: /bin/bash
